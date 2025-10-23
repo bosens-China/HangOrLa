@@ -33,7 +33,7 @@ jobs:
           cache: pnpm
 
       - name: 安装依赖
-        run: pnpm install --frozen-lockbook
+        run: pnpm install
 
       - name: 构建项目
         run: pnpm run build
