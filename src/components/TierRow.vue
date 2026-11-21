@@ -2,10 +2,12 @@
 import { computed } from 'vue';
 import { useEventListener } from '@vueuse/core';
 import { defaultBorderColor } from '../stores/useBoardStore';
+import { getTextColor } from '../utils/colors';
 
 const props = defineProps<{
   label: string;
   color: string;
+  textColor?: string;
   heightPx: number;
   labelWidthPx: number;
   pinLabel: boolean;
@@ -19,24 +21,7 @@ const emit = defineEmits<{
   (e: 'select'): void;
 }>();
 
-const isDarkBg = computed(() => {
-  const hex = props.color.trim().replace(/^#/, '');
-  let r = 255;
-  let g = 255;
-  let b = 255;
-  if (hex.length === 3) {
-    r = parseInt(hex[0]! + hex[0]!, 16);
-    g = parseInt(hex[1]! + hex[1]!, 16);
-    b = parseInt(hex[2]! + hex[2]!, 16);
-  } else if (hex.length >= 6) {
-    r = parseInt(hex.slice(0, 2), 16);
-    g = parseInt(hex.slice(2, 4), 16);
-    b = parseInt(hex.slice(4, 6), 16);
-  }
-  if (Number.isNaN(r) || Number.isNaN(g) || Number.isNaN(b)) return false;
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  return luminance < 0.55;
-});
+const textColor = computed(() => props.textColor ?? getTextColor(props.color));
 
 function onHResizeStart(e: MouseEvent) {
   const startX = e.clientX;
@@ -67,11 +52,12 @@ function onHResizeStart(e: MouseEvent) {
   >
     <div
       class="flex shrink-0 items-center justify-center font-700 select-none"
-      :class="[
-        pinLabel ? 'sticky left-0 z-40' : 'relative',
-        isDarkBg ? 'text-white' : 'text-dark',
-      ]"
-      :style="{ background: props.color, width: props.labelWidthPx + 'px' }"
+      :class="pinLabel ? 'sticky left-0 z-40' : 'relative'"
+      :style="{
+        background: props.color,
+        color: textColor,
+        width: props.labelWidthPx + 'px',
+      }"
     >
       <button
         type="button"

@@ -20,6 +20,7 @@ export type Tier = {
   id: string;
   label: string;
   color: string;
+  textColor?: string;
   showBorder?: boolean;
   borderColor?: string;
 };

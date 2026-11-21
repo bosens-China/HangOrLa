@@ -194,6 +194,7 @@ test('clearing releases images from both areas and keeps tier settings', async (
   board.gallery.value = [{ id: 'gallery', src: gallerySrc }];
   board.freeItems.value = [{ id: 'placed', src: placedSrc, x: 8, y: 0 }];
   board.tiers.value[0].label = '我的最爱';
+  board.tiers.value[0].textColor = '#2563eb';
   board.defaultLabelWidthPx.value = 180;
   board.imageFitMode.value = 'contain';
   board.startGalleryDrag('gallery', 0, 0);
@@ -203,9 +204,11 @@ test('clearing releases images from both areas and keeps tier settings', async (
   assert.deepEqual(board.freeItems.value, []);
   assert.equal(board.dropPreview.value, undefined);
   assert.equal(board.tiers.value[0].label, '我的最爱');
+  assert.equal(board.tiers.value[0].textColor, '#2563eb');
   assert.equal(board.defaultLabelWidthPx.value, 180);
   assert.equal(board.imageFitMode.value, 'contain');
   await assert.rejects(fetch(gallerySrc));
   await assert.rejects(fetch(placedSrc));
   board.resetToDefaults();
+  assert.equal(board.tiers.value[0].textColor, undefined);
 });

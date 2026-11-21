@@ -6,6 +6,7 @@ import Gallery from './Gallery.vue';
 import FreeImage from './FreeImage.vue';
 import HorizontalScrollbar from './HorizontalScrollbar.vue';
 import { useHorizontalScroll } from '../composables/useHorizontalScroll';
+import { getTextColor } from '../utils/colors';
 import {
   defaultBorderColor,
   useBoardStore,
@@ -237,6 +238,7 @@ function updateLabelWidth(v: number) {
             :key="t.id"
             :label="t.label"
             :color="t.color"
+            :text-color="t.textColor"
             :heightPx="defaultRowHeightPx"
             :labelWidthPx="defaultLabelWidthPx"
             :pin-label="pinnedLabelWidth > 0"
@@ -338,6 +340,7 @@ function updateLabelWidth(v: number) {
       v-model:show="showSettings"
       placement="right"
       :width="380"
+      style="max-width: 100vw"
       :show-mask="'transparent'"
     >
       <n-drawer-content title="用法与设置" closable>
@@ -361,7 +364,7 @@ function updateLabelWidth(v: number) {
             <div
               class="rounded-lg border border-solid border-zinc-200 bg-white p-3 space-y-3"
             >
-              <div class="flex items-center justify-between gap-4">
+              <div class="flex flex-wrap items-center justify-between gap-3">
                 <span class="text-xs font-medium text-zinc-700">标签列宽 (px)</span>
                 <n-input-number
                   v-model:value="defaultLabelWidthPx"
@@ -372,7 +375,7 @@ function updateLabelWidth(v: number) {
                 />
               </div>
               <div class="h-1px bg-zinc-100" />
-              <div class="flex items-center justify-between gap-4">
+              <div class="flex flex-wrap items-center justify-between gap-3">
                 <span class="text-xs font-medium text-zinc-700">图片裁剪方式</span>
                 <n-radio-group v-model:value="imageFitMode" size="small">
                   <n-radio-button value="cover">填满裁切</n-radio-button>
@@ -462,18 +465,20 @@ function updateLabelWidth(v: number) {
                   </div>
                 </div>
 
-                <div class="grid grid-cols-3 items-center gap-2.5 pt-1 border-t border-solid border-zinc-100 text-xs">
-                  <label class="space-y-1">
-                    <span class="block text-11px text-zinc-500">标签背景</span>
+                <div class="space-y-2 border-0 border-t border-solid border-zinc-100 pt-3 text-xs">
+                  <div class="flex items-center justify-between gap-3">
+                    <span class="text-zinc-600">标签背景</span>
                     <n-color-picker
                       v-model:value="t.color"
                       size="small"
+                      class="w-28"
+                      :aria-label="t.label + '标签背景'"
                       :show-alpha="false"
                     />
-                  </label>
-                  <label class="space-y-1">
-                    <span class="block text-11px text-zinc-500">底部分隔线</span>
-                    <div class="h-28px flex items-center">
+                  </div>
+                  <div class="flex items-center justify-between gap-3">
+                    <div class="flex items-center gap-2">
+                      <span class="text-zinc-600">底部分隔线</span>
                       <n-switch
                         size="small"
                         :value="t.showBorder !== false"
@@ -481,24 +486,34 @@ function updateLabelWidth(v: number) {
                         @update:value="t.showBorder = $event"
                       />
                     </div>
-                  </label>
-                  <label class="space-y-1">
-                    <span class="block text-11px text-zinc-500">分隔线颜色</span>
                     <n-color-picker
                       :value="t.borderColor ?? defaultBorderColor"
                       size="small"
+                      class="w-28"
+                      :aria-label="t.label + '分隔线颜色'"
                       :show-alpha="false"
                       :disabled="t.showBorder === false"
                       @update:value="t.borderColor = $event"
                     />
-                  </label>
+                  </div>
+                  <div class="flex items-center justify-between gap-3">
+                    <span class="text-zinc-600">文字颜色</span>
+                    <n-color-picker
+                      :value="t.textColor ?? getTextColor(t.color)"
+                      size="small"
+                      class="w-28"
+                      :aria-label="t.label + '文字颜色'"
+                      :show-alpha="false"
+                      @update:value="t.textColor = $event"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
           <!-- 底部重置区 -->
-          <div class="pt-2 border-t border-solid border-zinc-200 flex items-center justify-between">
+          <div class="pt-3 border-0 border-t border-solid border-zinc-200 flex flex-wrap items-center justify-between gap-3">
             <span class="text-xs text-zinc-500">还原初始等级与列宽</span>
             <n-popconfirm
               positive-text="恢复默认"
