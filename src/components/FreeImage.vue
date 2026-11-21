@@ -1,82 +1,138 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, onBeforeUnmount, ref } from 'vue';
 import { useBoardStore } from '../stores/useBoardStore';
 import BaseImage from './BaseImage.vue';
 import { useEventListener } from '@vueuse/core';
+import { NIcon } from 'naive-ui';
+import { CloseOutline } from '@vicons/ionicons5';
 
 const props = defineProps<{
   id: string;
   src: string;
   x: number;
   y: number;
-  w?: number;
-  h?: number;
 }>();
 
-const emit = defineEmits<{
-  (e: 'update:pos', id: string, x: number, y: number): void;
-}>();
+const {
+  defaultLabelWidthPx,
+  defaultRowHeightPx,
+  positionAt,
+  positionForMove,
+  hasBottomBorder,
+  canPlaceOrSwap,
+  updatePos,
+  returnImageToGallery,
+} = useBoardStore();
 
-const { tiers, defaultRowHeightPx, defaultLabelWidthPx, deleteImage } =
-  useBoardStore();
-
+const preview = ref<{ x: number; y: number }>();
+const returningToGallery = ref(false);
+const previewValid = computed(
+  () =>
+    !preview.value ||
+    returningToGallery.value ||
+    canPlaceOrSwap(props.id, preview.value),
+);
 const imageStyle = computed(() => ({
-  left: props.x + defaultLabelWidthPx.value + 'px',
-  top: props.y + 'px',
+  left: (preview.value?.x ?? props.x) + defaultLabelWidthPx.value + 'px',
+  top: (preview.value?.y ?? props.y) + 'px',
 }));
+const imageClass = computed(() =>
+  hasBottomBorder(preview.value ?? props) ? 'leave-bottom-border' : '',
+);
 
-const dragging = ref(false);
-let startX = 0;
-let startY = 0;
-let baseX = 0;
-let baseY = 0;
+let stopDragging: (() => void) | undefined;
+onBeforeUnmount(() => stopDragging?.());
 
-let stopMoveListener: (() => void) | null = null;
-let stopUpListener: (() => void) | null = null;
+function isOverGallery(clientY: number) {
+  const galleryEl = document.querySelector('.gallery');
+  if (!galleryEl) return false;
+  const rect = galleryEl.getBoundingClientRect();
+  return clientY >= rect.top;
+}
 
 function onDown(e: MouseEvent) {
-  dragging.value = true;
-  startX = e.clientX;
-  startY = e.clientY;
-  baseX = props.x;
-  baseY = props.y;
-  stopMoveListener = useEventListener(window, 'mousemove', onMove);
-  stopUpListener = useEventListener(window, 'mouseup', onUp);
-}
-function onMove(e: MouseEvent) {
-  if (!dragging.value) return;
+  if (e.button !== 0) return;
+  e.preventDefault();
+  stopDragging?.();
+  const start = positionAt(e.clientX, e.clientY);
+  const offsetX = start.x - props.x;
+  const offsetY = start.y - props.y;
+  const startY = props.y;
 
-  // X-axis boundaries (left)
-  const nx = Math.max(0, baseX + (e.clientX - startX));
-
-  // Y-axis boundaries (top and bottom)
-  const topBoundary = 0;
-  const totalRowHeight = tiers.value.length * defaultRowHeightPx.value;
-  const bottomBoundary = totalRowHeight - (props.h || 0);
-  let ny = baseY + (e.clientY - startY);
-  ny = Math.max(topBoundary, ny);
-  ny = Math.min(bottomBoundary, ny);
-
-  emit('update:pos', props.id, nx, ny);
-}
-function onUp() {
-  dragging.value = false;
-  stopMoveListener?.();
-  stopUpListener?.();
+  function getPosition(event: MouseEvent) {
+    const point = positionAt(event.clientX, event.clientY);
+    return positionForMove(
+      point.x - offsetX,
+      point.y - offsetY,
+      startY,
+      event.shiftKey,
+    );
+  }
+  const stopMove = useEventListener(window, 'mousemove', (event) => {
+    returningToGallery.value = isOverGallery(event.clientY);
+    preview.value = getPosition(event);
+  });
+  const stopUp = useEventListener(window, 'mouseup', (event) => {
+    if (event.button !== 0) return;
+    if (isOverGallery(event.clientY)) {
+      returnImageToGallery(props.id);
+    } else {
+      updatePos(props.id, getPosition(event));
+    }
+    stopDragging?.();
+  });
+  const stopBlur = useEventListener(window, 'blur', () => stopDragging?.());
+  stopDragging = () => {
+    stopMove();
+    stopUp();
+    stopBlur();
+    preview.value = undefined;
+    returningToGallery.value = false;
+    stopDragging = undefined;
+  };
 }
 </script>
 
 <template>
   <div
-    class="absolute select-none cursor-move"
+    class="image-actions absolute select-none rounded"
+    :class="[
+      preview ? 'z-30 opacity-75' : 'z-20',
+      preview && !previewValid
+        ? 'ring-2 ring-red-500 cursor-not-allowed'
+        : 'cursor-move',
+      returningToGallery ? 'ring-2 ring-amber-500 scale-90 transition-transform' : '',
+    ]"
     :style="imageStyle"
-    @mousedown.prevent="onDown"
+    @mousedown="onDown"
   >
     <BaseImage
-      :id="props.id"
       :src="props.src"
-      :size="props.h || props.w || 0"
-      @delete="deleteImage"
+      :size="defaultRowHeightPx"
+      :class="imageClass"
     />
+    <span
+      v-if="returningToGallery"
+      class="pointer-events-none absolute inset-x-1 bottom-1 rounded bg-amber-600/90 px-1 py-0.5 text-center text-11px text-white"
+    >
+      松手移回图库
+    </span>
+    <button
+      v-if="!preview"
+      type="button"
+      class="image-action"
+      aria-label="移回图库"
+      title="移回图库"
+      @mousedown.stop
+      @click="returnImageToGallery(props.id)"
+    >
+      <n-icon size="16" :component="CloseOutline" />
+    </button>
   </div>
 </template>
+
+<style scoped>
+.leave-bottom-border {
+  clip-path: inset(0 0 1px);
+}
+</style>

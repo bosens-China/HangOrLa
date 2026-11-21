@@ -1,35 +1,42 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import { useEventListener } from '@vueuse/core';
+import { defaultBorderColor } from '../stores/useBoardStore';
 
 const props = defineProps<{
   label: string;
   color: string;
   heightPx: number;
   labelWidthPx: number;
+  pinLabel: boolean;
+  selected: boolean;
+  showBorder?: boolean;
+  borderColor?: string;
 }>();
 
 const emit = defineEmits<{
-  (e: 'update:heightPx', value: number): void;
   (e: 'update:labelWidthPx', value: number): void;
+  (e: 'select'): void;
 }>();
 
-function onResizeStart(e: MouseEvent) {
-  const startY = e.clientY;
-  const start = props.heightPx;
-  const onMove = (ev: MouseEvent) => {
-    const delta = ev.clientY - startY;
-    const next = Math.max(
-      60,
-      Math.min(260, Math.round((start + delta) / 10) * 10),
-    );
-    emit('update:heightPx', next);
-  };
-  const stopMove = useEventListener(window, 'mousemove', onMove);
-  const stopUp = useEventListener(window, 'mouseup', () => {
-    stopMove();
-    stopUp();
-  });
-}
+const isDarkBg = computed(() => {
+  const hex = props.color.trim().replace(/^#/, '');
+  let r = 255;
+  let g = 255;
+  let b = 255;
+  if (hex.length === 3) {
+    r = parseInt(hex[0]! + hex[0]!, 16);
+    g = parseInt(hex[1]! + hex[1]!, 16);
+    b = parseInt(hex[2]! + hex[2]!, 16);
+  } else if (hex.length >= 6) {
+    r = parseInt(hex.slice(0, 2), 16);
+    g = parseInt(hex.slice(2, 4), 16);
+    b = parseInt(hex.slice(4, 6), 16);
+  }
+  if (Number.isNaN(r) || Number.isNaN(g) || Number.isNaN(b)) return false;
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance < 0.55;
+});
 
 function onHResizeStart(e: MouseEvent) {
   const startX = e.clientX;
@@ -49,23 +56,43 @@ function onHResizeStart(e: MouseEvent) {
 
 <template>
   <div
-    class="relative flex overflow-hidden"
-    :style="{ height: props.heightPx + 'px', borderBottom: '1px solid #000' }"
+    class="relative flex box-border"
+    :style="{
+      height: props.heightPx + 'px',
+      borderBottom:
+        props.showBorder === false
+          ? undefined
+          : '1px solid ' + (props.borderColor ?? defaultBorderColor),
+    }"
   >
     <div
-      class="flex items-center justify-center font-700 text-dark relative select-none"
+      class="flex shrink-0 items-center justify-center font-700 select-none"
+      :class="[
+        pinLabel ? 'sticky left-0 z-40' : 'relative',
+        isDarkBg ? 'text-white' : 'text-dark',
+      ]"
       :style="{ background: props.color, width: props.labelWidthPx + 'px' }"
     >
-      {{ label }}
+      <button
+        type="button"
+        class="h-full w-full cursor-pointer border-0 bg-transparent text-base text-inherit font-700"
+        :aria-pressed="selected"
+        :title="
+          selected
+            ? '当前自动摆放目标行（点击图库图片将摆放到此行）'
+            : '点击设为自动摆放的目标行'
+        "
+        @click="emit('select')"
+      >
+        {{ label }}
+      </button>
       <div
-        class="absolute right-0 top-0 bottom-0 w-1 cursor-ew-resize"
+        class="absolute right-0 top-0 bottom-0 w-1.5 cursor-ew-resize hover:bg-black/15 transition-colors"
+        title="拖动调整标签列宽度"
         @mousedown.prevent="onHResizeStart"
       />
     </div>
 
-    <div
-      class="absolute left-0 right-0 bottom-0 h-1 cursor-ns-resize z-10"
-      @mousedown.prevent="onResizeStart"
-    />
+    <slot />
   </div>
 </template>

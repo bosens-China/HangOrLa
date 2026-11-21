@@ -1,136 +1,167 @@
 <script setup lang="ts">
+import { ref } from 'vue';
 import BaseImage from './BaseImage.vue';
-import { useBoardStore } from '../stores/useBoardStore';
+import HorizontalScrollbar from './HorizontalScrollbar.vue';
+import ImageImportDialog from './ImageImportDialog.vue';
+import { useHorizontalScroll } from '../composables/useHorizontalScroll';
+import {
+  galleryDragType,
+  useBoardStore,
+  type GalleryItem,
+} from '../stores/useBoardStore';
 import { NIcon } from 'naive-ui';
-import { CloudUploadOutline, AddCircleOutline } from '@vicons/ionicons5';
+import { AddOutline, TrashOutline } from '@vicons/ionicons5';
 
 defineOptions({ name: 'ImageGallery' });
 
-type ImageItem = { id: string; src: string };
+const items = defineModel<GalleryItem[]>({ required: true });
+const emit = defineEmits<{ spawn: [item: GalleryItem] }>();
+const props = defineProps<{ heightPx: number; targetLabel?: string }>();
 
-const items = defineModel<ImageItem[]>();
-const emit = defineEmits<{
-  (e: 'added', list: ImageItem[]): void;
-  (e: 'spawn', item: ImageItem): void;
-}>();
-const fileRef = ref<HTMLInputElement | null>(null);
-function openFileDialog() {
-  fileRef.value?.click();
-}
-const props = defineProps<{ heightPx: number }>();
+const { deleteGalleryImage, startGalleryDrag, endGalleryDrag } =
+  useBoardStore();
+const importing = ref(false);
+const pendingRemoval = ref<string>();
+const galleryViewport = ref<HTMLDivElement | null>(null);
+const galleryContent = ref<HTMLDivElement | null>(null);
+const horizontal = useHorizontalScroll(galleryViewport, galleryContent);
 
-const { deleteImage } = useBoardStore();
-
-function onFileChange(ev: Event) {
-  const input = ev.target as HTMLInputElement;
-  if (!input.files || !items.value) return;
-  const added: ImageItem[] = [];
-  for (const f of Array.from(input.files)) {
-    const url = URL.createObjectURL(f);
-    const it = { id: crypto.randomUUID(), src: url };
-    items.value.push(it);
-    added.push(it);
-  }
-  input.value = '';
-  emit('added', added);
+function addImages(images: GalleryItem[]) {
+  items.value = [...items.value, ...images];
+  importing.value = false;
 }
 
-function onPaste(e: ClipboardEvent) {
-  if (!items.value) return;
-  const files = Array.from(e.clipboardData?.files || []);
-  if (!files.length) return;
-  const added: ImageItem[] = [];
-  files.forEach((f) => {
-    const it = { id: crypto.randomUUID(), src: URL.createObjectURL(f) };
-    items.value!.push(it);
-    added.push(it);
-  });
-  emit('added', added);
+function confirmDeletion() {
+  if (pendingRemoval.value !== undefined)
+    deleteGalleryImage(pendingRemoval.value);
+  pendingRemoval.value = undefined;
 }
 
-function onThumbClick(it: ImageItem) {
-  emit('spawn', it);
-  if (!items.value) return;
-  const idx = items.value.findIndex((x) => x.id === it.id);
-  if (idx >= 0) items.value.splice(idx, 1);
-}
-
-function onDragStart(it: ImageItem, e: DragEvent) {
-  if (!e.dataTransfer) return;
-  e.dataTransfer.setData('text/plain', it.id);
+function onDragStart(it: GalleryItem, e: DragEvent) {
+  if (!e.dataTransfer || !(e.currentTarget instanceof HTMLElement)) return;
+  const rect = e.currentTarget.getBoundingClientRect();
+  const offsetX = e.clientX - rect.left;
+  const offsetY = e.clientY - rect.top;
   e.dataTransfer.setData(
-    'application/json',
-    JSON.stringify({ offsetX: e.offsetX, offsetY: e.offsetY }),
+    galleryDragType,
+    [it.id, offsetX, offsetY].join(','),
   );
+  startGalleryDrag(it.id, offsetX, offsetY);
 }
 </script>
 
 <template>
-  <div
-    class="border-t border-gray-200 p-2 bg-gray-50"
-    :style="{ height: props.heightPx + 'px' }"
-    @paste="onPaste"
-  >
-    <div
-      v-if="!items || items.length === 0"
-      class="h-full flex flex-col items-center justify-center gap-2 text-gray-500"
-    >
-      <div class="flex items-center gap-2">
-        <n-button size="small" type="primary" secondary @click="openFileDialog">
-          <template #icon>
-            <n-icon :component="CloudUploadOutline" />
-          </template>
-          上传图片</n-button
-        >
-        <input
-          ref="fileRef"
-          id="gallery-file"
-          type="file"
-          multiple
-          accept="image/*"
-          @change="onFileChange"
-          hidden
-        />
-      </div>
-      <span>点击/粘贴添加图片，添加后会出现在画布，可任意拖拽</span>
-    </div>
-    <div v-else class="h-full flex items-center gap-2 overflow-x-auto">
+  <div class="gallery bg-gray-50 shrink-0 flex items-start gap-2">
+    <div v-if="items.length" class="gallery-strip relative min-w-0">
       <div
-        v-for="it in items"
-        :key="it.id"
-        class="h-full cursor-grab"
-        draggable="true"
-        @dragstart="(e) => onDragStart(it, e)"
-        @click="onThumbClick(it)"
+        ref="galleryViewport"
+        class="hide-native-scrollbar overflow-x-auto overflow-y-hidden"
+        @scroll.passive="horizontal.sync"
       >
-        <BaseImage
-          :id="it.id"
-          :src="it.src"
-          :size="props.heightPx"
-          @delete="deleteImage"
-        />
+        <div ref="galleryContent" class="flex w-max items-center gap-2">
+          <div
+            v-for="it in items"
+            :key="it.id"
+            class="image-actions relative shrink-0"
+          >
+            <button
+              type="button"
+              class="block cursor-grab border-0 bg-transparent p-0"
+              :aria-label="
+                targetLabel ? '自动摆放到' + targetLabel : '自动摆放'
+              "
+              :title="
+                targetLabel
+                  ? '点击自动摆放到「' + targetLabel + '」，或拖入榜单'
+                  : '点击自动摆放，或拖入榜单'
+              "
+              draggable="true"
+              @dragstart="(e) => onDragStart(it, e)"
+              @dragend="endGalleryDrag"
+              @click="emit('spawn', it)"
+            >
+              <BaseImage :src="it.src" :size="props.heightPx" />
+            </button>
+            <button
+              type="button"
+              class="image-action"
+              aria-label="删除图库图片"
+              title="删除图片"
+              @click="pendingRemoval = it.id"
+            >
+              <n-icon :component="TrashOutline" />
+            </button>
+          </div>
+        </div>
       </div>
-
-      <n-button size="small" type="primary" secondary @click="openFileDialog">
-        <template #icon>
-          <n-icon :component="CloudUploadOutline" />
-        </template>
-        上传图片</n-button
-      >
-      <input
-        ref="fileRef"
-        id="gallery-file"
-        type="file"
-        multiple
-        accept="image/*"
-        @change="onFileChange"
-        hidden
+      <HorizontalScrollbar
+        v-if="horizontal.limit.value > 0 && horizontal.width.value > 16"
+        class="gallery-scrollbar absolute bottom-1 left-2 z-10"
+        :width="horizontal.width.value - 16"
+        :offset="horizontal.offset.value"
+        :limit="horizontal.limit.value"
+        label="图库横向滚动"
+        @scroll="horizontal.scrollTo"
       />
-      <label for="gallery-file" class="cursor-pointer">
-        <n-icon size="24" :component="AddCircleOutline" title="添加图片" />
-      </label>
     </div>
+    <button
+      type="button"
+      class="add-image-tile"
+      :style="{ width: heightPx + 'px', height: heightPx + 'px' }"
+      aria-label="添加图片"
+      title="添加图片"
+      @click="importing = true"
+    >
+      <n-icon size="28" :component="AddOutline" />
+    </button>
+
+    <ImageImportDialog
+      v-if="importing"
+      @close="importing = false"
+      @confirm="addImages"
+    />
+    <n-modal
+      :show="pendingRemoval !== undefined"
+      preset="dialog"
+      type="warning"
+      title="删除图库图片？"
+      content="这张图片将从图库移除。"
+      positive-text="删除"
+      negative-text="取消"
+      @positive-click="confirmDeletion"
+      @update:show="(show) => !show && (pendingRemoval = undefined)"
+    />
   </div>
 </template>
 
-<style scoped></style>
+<style scoped>
+.gallery {
+  border-top: 1px solid #e4e4e7;
+}
+
+.gallery-strip:hover .gallery-scrollbar {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.add-image-tile {
+  display: grid;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  place-items: center;
+  padding: 0;
+  border: 1px dashed #a1a1aa;
+  border-radius: 6px;
+  background: white;
+  color: #52525b;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.add-image-tile:hover,
+.add-image-tile:focus-visible {
+  border-color: #18181b;
+  background: #f4f4f5;
+  color: #09090b;
+}
+</style>
