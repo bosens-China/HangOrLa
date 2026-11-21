@@ -317,22 +317,30 @@ function updateLabelWidth(v: number) {
     <n-modal
       v-model:show="showAbout"
       preset="card"
-      title="关于「由航到拉」"
+      title="关于「从夯到拉」"
       closable
       class="max-w-440px"
     >
-      <div class="space-y-3 text-sm text-zinc-600 leading-relaxed">
+      <div
+        class="overflow-y-auto space-y-3 text-sm text-zinc-600 leading-relaxed"
+        style="max-height: calc(100dvh - 160px)"
+      >
         <p class="m-0">
-          把图片拖到「夯」到「拉」的等级行里，做一张自己的排行图。也可以把图片放在两行之间，表达介于两档的评价。
+          “从夯到拉”是一个网络流行语，表示一种新的评价体系，通常将事物分为夯、顶级、人上人、NPC、拉完了等五个等级，夯代表最优秀的状态。
         </p>
-        <div
-          class="rounded-md border border-solid border-zinc-200 bg-zinc-50 p-3 text-xs space-y-1.5 text-zinc-600"
-        >
-          <div class="font-medium text-zinc-900">快捷操作提示</div>
-          <div>• 点击左侧等级标签可切换「自动摆放」的目标行</div>
-          <div>• 拖拽图片自动吸附行或分隔线，按住 <kbd class="rounded border border-solid border-zinc-200 bg-white px-1 py-0.5 text-11px">Shift</kbd> 可自由微调</div>
-          <div>• 同一等级行内的两张图片可直接互相拖拽对调位置</div>
-        </div>
+        <p class="m-0">
+          该梗起源于网络，通过视频等形式在中国网络上迅速传播。其分级体系为：
+        </p>
+        <ul class="m-0 pl-5 space-y-1.5">
+          <li><strong>夯</strong>：代表事物的极致优秀状态，超越常规评价标准。</li>
+          <li><strong>顶级</strong>：非常优秀，但略逊于“夯”。</li>
+          <li><strong>人上人</strong>：比普通人更优秀的存在。</li>
+          <li><strong>NPC</strong>：指中规中矩的人，表现平平。</li>
+          <li><strong>拉完了</strong>：表示最低级别，通常指表现极差的状态。</li>
+        </ul>
+        <p class="m-0">
+          这一评价体系被广泛应用于多个领域，包括游戏角色强度分析、武器排名、时尚品牌评价等。它反映了网络文化中对事物评价的多样性和个性化，成为一种新的表达方式。
+        </p>
       </div>
     </n-modal>
 
