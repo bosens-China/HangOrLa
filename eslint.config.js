@@ -7,6 +7,9 @@ import autoImport from './.eslintrc-auto-import.json' with { type: 'json' };
 
 export default defineConfig([
   {
+    ignores: ['dist/**', 'auto-imports.d.ts', 'components.d.ts'],
+  },
+  {
     files: ['**/*.{js,mjs,cjs,ts,mts,cts,vue}'],
     plugins: { js },
     extends: ['js/recommended'],
@@ -18,5 +21,12 @@ export default defineConfig([
     files: ['**/*.vue'],
     languageOptions: { parserOptions: { parser: tseslint.parser } },
   },
-  autoImport,
+  {
+    files: ['src/**/*.{ts,vue}'],
+    languageOptions: { globals: autoImport.globals },
+  },
+  {
+    files: ['*.{js,ts,mjs}', 'src/**/test/**/*.mjs'],
+    languageOptions: { globals: globals.node },
+  },
 ]);
